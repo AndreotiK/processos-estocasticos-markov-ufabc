@@ -62,7 +62,7 @@ def simular_e_plotar(params: SimulacaoRequest):
     buf = io.BytesIO()
     fig.savefig(buf, format="png", bbox_inches="tight")
     buf.seek(0)
-    plt.close(fig) # Essencial: libera a memória RAM do servidor
+    plt.close(fig) # libera a memória RAM do servidor
     
     # 4. Codifica em Base64
     imagem_base64 = base64.b64encode(buf.getvalue()).decode("utf-8")
