@@ -2,7 +2,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-# Importações para plotagem e manipulação de dados
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -14,10 +13,18 @@ from src.markov_systems.simulation import gerar_lancamentos, calcular_media_acum
 
 app = FastAPI(title="Simulador Markov - IC UFABC")
 
-# Configuração essencial de CORS
+import sys
+import os
+
+# Adiciona a raiz do projeto ao caminho de busca do Python
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
 origins = [
-    "http://localhost:3000",  # Porta padrão do React (Create React App)
-    "http://localhost:5173",  # Porta padrão do Vite
+    "http://localhost:3000",
+    "http://localhost:5173",
 ]
 
 app.add_middleware(
@@ -31,6 +38,7 @@ app.add_middleware(
 class SimulacaoRequest(BaseModel):
     n: int
     seed: int | None = None
+    p_cara: float = 0.5 # NOVO: Probabilidade de cara (default 50%)
 
 @app.get("/")
 def read_root():
@@ -39,7 +47,9 @@ def read_root():
 @app.post("/simular")
 def simular_e_plotar(params: SimulacaoRequest):
     # 1. Executa a lógica científica
-    lancamentos = gerar_lancamentos(n=params.n, seed=params.seed)
+    # NOTA: Passe o p_cara para a sua função. 
+    # (Se a sua função não aceitar esse argumento ainda, veja o Passo 3 abaixo)
+    lancamentos = gerar_lancamentos(n=params.n, seed=params.seed, p_cara=params.p_cara)
     medias = calcular_media_acumulada(lancamentos)
     
     # 2. Gera o gráfico
@@ -47,25 +57,32 @@ def simular_e_plotar(params: SimulacaoRequest):
     eixo_x = np.arange(1, len(medias) + 1)
     
     ax.plot(eixo_x, medias, color="navy", lw=1.2, label="Média Acumulada")
-    ax.axhline(0, color="red", linestyle="--", label="Equilíbrio (0)")
     
-    # Fixando o eixo Y para visualizar o funil
+    # NOVO: Calcula o Valor Esperado (Esperança) da moeda viciada
+    # Se Cara = +1 e Coroa = -1: E(X) = 1*p_cara + (-1)*(1 - p_cara) = 2*p_cara - 1
+    valor_esperado = (2 * params.p_cara) - 1
+    
+    ax.axhline(valor_esperado, color="red", linestyle="--", label=f"Esperança ({valor_esperado:.2f})")
+    
+    # Mantém a linha do zero apenas como referência visual
+    ax.axhline(0, color="gray", linestyle=":", label="Zero")
+    
     ax.set_ylim(-1.1, 1.1)
     
     ax.set_xlabel("Número de Lançamentos")
     ax.set_ylabel("Média (Cara=+1, Coroa=-1)")
-    ax.set_title(f"Simulação da Moeda (n={params.n}, seed={params.seed})")
+    ax.set_title(f"Simulação (n={params.n}, seed={params.seed}, P(Cara)={params.p_cara*100:.0f}%)")
     ax.legend()
     ax.grid(alpha=0.3)
     
-    # 3. Salva a imagem em memória e fecha a figura
+    # 3. Salva a imagem
     buf = io.BytesIO()
     fig.savefig(buf, format="png", bbox_inches="tight")
     buf.seek(0)
-    plt.close(fig) # libera a memória RAM do servidor
+    plt.close(fig) 
     
-    # 4. Codifica em Base64
+    # 4. Codifica
     imagem_base64 = base64.b64encode(buf.getvalue()).decode("utf-8")
     
-    # 5. Retorna o JSON para o frontend
+    # 5. Retorna
     return {"imagem_base64": imagem_base64}

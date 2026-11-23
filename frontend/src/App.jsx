@@ -1,26 +1,29 @@
 import { useState } from 'react';
 
 function App() {
-  // 1. Estados do React
-  const [n, setN] = useState(1000);           // Número de lançamentos
-  const [seed, setSeed] = useState(42);       // Semente
-  const [imagem, setImagem] = useState(null); // String Base64 do gráfico
-  const [carregando, setCarregando] = useState(false); // Status do botão
+  const [n, setN] = useState(1000);
+  const [seed, setSeed] = useState(42);
+  // NOVO ESTADO: Probabilidade de Cara (0 a 100)
+  const [probabilidade, setProbabilidade] = useState(50); 
+  const [imagem, setImagem] = useState(null);
+  const [carregando, setCarregando] = useState(false);
 
-  // 2. Função que faz a chamada para o Backend
   const handleSimular = async () => {
     setCarregando(true);
-    setImagem(null); // Limpa a imagem anterior, se houver
+    setImagem(null);
 
     try {
-      // Fazemos um POST para o FastAPI
       const response = await fetch('http://localhost:8000/simular', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        // Convertemos n e seed para inteiros, pois os inputs do HTML retornam strings
-        body: JSON.stringify({ n: parseInt(n), seed: parseInt(seed) }),
+        body: JSON.stringify({ 
+          n: parseInt(n), 
+          seed: parseInt(seed),
+          // NOVO: Envia a probabilidade dividida por 100 (ex: 50% -> 0.5)
+          p_cara: probabilidade / 100 
+        }),
       });
 
       if (!response.ok) {
@@ -28,8 +31,6 @@ function App() {
       }
 
       const data = await response.json();
-      
-      // 3. Monta a URL de dados que a tag <img> consegue renderizar
       setImagem(`data:image/png;base64,${data.imagem_base64}`);
       
     } catch (error) {
@@ -40,13 +41,11 @@ function App() {
     }
   };
 
-  // 4. A Interface Visual (JSX)
   return (
     <div style={{ maxWidth: '900px', margin: '0 auto', padding: '2rem' }}>
       <h1>Simulador de Processos Estocásticos</h1>
-      <p>Moeda Justa (Cara = +1, Coroa = -1)</p>
+      <p>Moeda (Cara = +1, Coroa = -1)</p>
 
-      {/* Painel de Controle */}
       <div style={{ 
         display: 'flex', 
         gap: '1rem', 
@@ -55,7 +54,8 @@ function App() {
         backgroundColor: '#fff',
         padding: '1.5rem',
         borderRadius: '8px',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+        flexWrap: 'wrap' // Permite quebrar linha em telas menores
       }}>
         <div>
           <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
@@ -65,19 +65,37 @@ function App() {
             type="number" 
             value={n} 
             onChange={(e) => setN(e.target.value)}
-            style={{ padding: '0.5rem', width: '120px' }}
+            style={{ padding: '0.5rem', width: '100px' }}
           />
         </div>
 
         <div>
           <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
-            Semente (seed):
+            Semente:
           </label>
           <input 
             type="number" 
             value={seed} 
             onChange={(e) => setSeed(e.target.value)}
-            style={{ padding: '0.5rem', width: '120px' }}
+            style={{ padding: '0.5rem', width: '100px' }}
+          />
+        </div>
+
+        {/* NOVO: Slider de Probabilidade */}
+        <div style={{ flex: 1, minWidth: '250px' }}>
+          <label style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+            <span>Coroa (0%)</span>
+            <span style={{ color: '#007bff' }}>Cara: {probabilidade}%</span>
+            <span>Cara (100%)</span>
+          </label>
+          <input 
+            type="range" 
+            min="0" 
+            max="100" 
+            step="1"
+            value={probabilidade} 
+            onChange={(e) => setProbabilidade(parseInt(e.target.value))}
+            style={{ width: '100%', cursor: 'pointer' }}
           />
         </div>
 
@@ -92,14 +110,14 @@ function App() {
             borderRadius: '4px',
             cursor: carregando ? 'not-allowed' : 'pointer',
             fontWeight: 'bold',
-            height: '40px'
+            height: '40px',
+            flexShrink: 0
           }}
         >
           {carregando ? 'Simulando...' : 'Simular'}
         </button>
       </div>
 
-      {/* Área de Exibição do Gráfico */}
       {imagem && (
         <div style={{ 
           backgroundColor: '#fff', 
